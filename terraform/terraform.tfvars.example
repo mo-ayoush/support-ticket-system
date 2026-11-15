@@ -1,0 +1,4 @@
+admin_email       = "admin@example.com"
+cognito_domain_prefix = "replace-with-globally-unique-prefix"
+budget_email      = "billing@example.com"
+monthly_budget_limit = "100"

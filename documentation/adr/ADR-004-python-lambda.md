@@ -27,6 +27,8 @@ The Python application will run inside Lambda and handle:
 - Handling application errors.
 - Returning appropriate HTTP status codes and JSON responses.
 
+The current implementation splits these responsibilities into Python 3.12 Idempotency, Write, and Read Lambdas, with shared validation and response helpers.
+
 ## Alternatives Considered
 
 ### Option A – Python on AWS Lambda

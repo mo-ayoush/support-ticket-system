@@ -16,9 +16,11 @@ override.tf.json
 terraform.rc
 
 # Python
+build/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
 .venv/
 venv/
 
@@ -30,3 +32,14 @@ venv/
 # Operating system
 .DS_Store
 Thumbs.db
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
+
+# Local backups and generated deployment packages
+*.backup
+*.backup-*
+terraform/*.zip

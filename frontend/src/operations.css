@@ -1,0 +1,8 @@
+.operation-center{margin-bottom:18px;padding:16px 20px}
+.operation-row{display:flex;align-items:center;gap:12px;border-top:1px solid #eff2f6;padding:10px 0}
+.operation-row>div{display:grid;gap:3px;flex:1;min-width:0}
+.operation-row small{color:#8290a2;font-size:11px;overflow-wrap:anywhere}
+.operation-row .button{padding:7px 10px}
+.status-pill.ambiguous{background:#fff3df;color:#9b6414}
+.status-pill.failed{background:#ffeff0;color:#b83e49}
+@media(max-width:650px){.operation-row{align-items:flex-start;flex-wrap:wrap}.operation-row>div{flex-basis:65%}}

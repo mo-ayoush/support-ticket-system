@@ -1,5 +1,7 @@
 # Architecture Comparison – AWS Support Ticket Management System
 
+> This comparison records the initial architecture evaluation. The selected serverless option has since been refined with Cognito, asynchronous FIFO writes, idempotency, authorization indexes, audit records, notifications, monitoring, and budget alerts. The current API contract is in `application/api-design.md`; initial Scan/direct-CRUD examples below are historical and superseded.
+
 ## 1. Overview
 
 This document compares two possible AWS architectures for the Support Ticket Management System.
@@ -138,8 +140,8 @@ Example ticket item:
   "priority": "HIGH",
   "status": "OPEN",
   "created_by": "student",
-  "created_timestamp": "2026-11-06T10:00:00Z",
-  "updated_timestamp": "2026-11-06T10:00:00Z"
+  "created_at": "2026-11-06T10:00:00Z",
+  "updated_at": "2026-11-06T10:00:00Z"
 }
 ```
 
@@ -187,16 +189,16 @@ The application exposes the following REST API endpoints:
 | Operation | HTTP Method | Endpoint | DynamoDB Operation |
 |---|---|---|---|
 | Create ticket | POST | `/tickets` | `PutItem` |
-| List tickets | GET | `/tickets` | `Scan` |
+| List tickets | GET | `/tickets` | `Query` on user/admin GSIs |
 | Get ticket by ID | GET | `/tickets/{ticket_id}` | `GetItem` |
 | Update ticket | PUT | `/tickets/{ticket_id}` | `UpdateItem` |
-| Delete ticket | DELETE | `/tickets/{ticket_id}` | `DeleteItem` |
+| Delete ticket | DELETE | `/tickets/{ticket_id}` | Transactional soft delete |
 
 In Architecture A, API Gateway routes the request to Lambda, and Lambda performs the corresponding DynamoDB operation.
 
 In Architecture B, the Python API running inside the ECS container handles the route and performs the corresponding DynamoDB operation.
 
-**Note:** `Scan` reads items across a DynamoDB table and is acceptable as a simple initial approach for a small educational project. For larger datasets, it can become less efficient and more expensive. A suitable `Query` access pattern or secondary index can be considered if future requirements need it.
+The initial `Scan` proposal was replaced by indexed Query operations in the implementation to enforce per-user visibility and newest-first lists.
 
 ## 6. HTTP Status Codes
 

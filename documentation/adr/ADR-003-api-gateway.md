@@ -35,6 +35,10 @@ The planned API endpoints are:
 
 The Python Lambda application will handle request validation, business logic, DynamoDB operations, and response generation.
 
+### Current implementation refinement
+
+The REST API uses a Cognito User Pool authorizer with the API-specific `support-ticket-api/tickets` OAuth scope and Lambda proxy integration. Clients provide Cognito access tokens; Lambdas retain group and ownership checks. Writes route to the Idempotency Lambda and return 202 after queue acceptance; reads route to the Read Lambda. `GET /requests/{operation_id}` returns one operation after actor, ticket-owner, or Admin authorization. Admin-only routes expose audit history and DLQ inspection. Terraform configures request models, preflight and default error CORS, redacted API access logs, method metrics, and API error/latency alarms.
+
 ## Alternatives Considered
 
 ### Option A – Amazon API Gateway

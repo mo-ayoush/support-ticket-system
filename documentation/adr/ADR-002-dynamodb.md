@@ -20,8 +20,8 @@ Each ticket contains the following attributes:
 - `priority`
 - `status`
 - `created_by`
-- `created_timestamp`
-- `updated_timestamp`
+- `created_at`
+- `updated_at`
 
 The application must support creating, listing, retrieving, updating, and deleting tickets.
 
@@ -53,8 +53,8 @@ Example:
   "priority": "HIGH",
   "status": "OPEN",
   "created_by": "student",
-  "created_timestamp": "2026-11-06T10:00:00Z",
-  "updated_timestamp": "2026-11-06T10:00:00Z"
+  "created_at": "2026-11-06T10:00:00Z",
+  "updated_at": "2026-11-06T10:00:00Z"
 }
 ```
 
@@ -101,12 +101,12 @@ The application will use the following DynamoDB operations:
 | Application operation | DynamoDB operation |
 |---|---|
 | Create ticket | `PutItem` |
-| List tickets | `Scan` |
+| List tickets for a SupportUser/Admin | `Query` on `UserTicketsIndex` / `AdminTicketsIndex` |
 | Retrieve ticket by ID | `GetItem` |
 | Update ticket | `UpdateItem` |
-| Delete ticket | `DeleteItem` |
+| Delete ticket | Transactional `Put` with `status = DELETED` |
 
-The `Scan` operation is acceptable for the initial small educational workload. If the application grows, more efficient access patterns using `Query` and suitable indexes can be considered.
+Ticket lists use `created_by` + `created_sort` and `admin_partition` + `created_sort` GSIs for newest-first user/admin lists. Exact operation status uses a consistent key lookup by idempotency/operation ID, with actor, ticket-owner, or Admin authorization. The notification table is a durable outbox: a scheduled worker claims PENDING records, retries definite SNS service rejections with a bounded attempt count, and quarantines ambiguous outcomes so they are never automatically republished. Ticket, audit, idempotency completion, and notification intent are transacted.
 
 ## Consequences
 

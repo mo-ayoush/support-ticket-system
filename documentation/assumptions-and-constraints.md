@@ -1,56 +1,39 @@
 # Assumptions and Constraints
 
-## 1. Assumptions
+## Assumptions
 
-- The system is intended for a small educational support-ticket workload.
-- Clients will interact with the system through HTTP API requests.
-- The application will be implemented in Python.
-- Amazon DynamoDB will provide persistent ticket storage.
-- AWS Lambda will execute the application logic.
-- Amazon API Gateway will expose the API endpoints.
-- Terraform will manage the cloud infrastructure.
-- Ticket IDs will be unique.
-- Ticket status and priority values must match the values defined in the project requirements.
-- AWS credentials and permissions will be configured before deployment.
-- The initial implementation will use a single AWS Region.
+- Small educational workload: approximately 5–50 users and 10 requests per user per day; these are planning estimates.
+- Users and Admins are provisioned and assigned Cognito groups by an operator. Terraform creates the pool and groups but does not provision accounts.
+- Clients use Cognito access tokens with the API Gateway REST API's API-specific `support-ticket-api/tickets` OAuth scope.
+- The browser uses Cognito managed login with OAuth authorization code + PKCE, and keeps auth tokens in session storage.
+- Frontend callback/logout URLs and API CORS origins are set to the exact browser origin used by the deployment.
+- Ticket ownership is the authenticated user's `sub`; trusted identity/group claims are forwarded to the asynchronous writer.
+- AWS resources are deployed in one Region, `eu-central-1`.
+- Client retries reuse a key for the same operation. Idempotency records are retained for 30 days before TTL expiration, exceeding the combined queue/DLQ retention window.
 
-## 2. Constraints
+## Constraints
 
-- The project must remain cost-conscious.
-- AWS usage must be monitored to avoid unexpected charges.
-- Resources must be destroyed after testing and the final demonstration.
-- The application must return clear errors for invalid input and missing tickets.
-- The implementation must be reproducible from the GitHub repository.
-- Secrets and private credentials must not be committed to Git.
-- The application must not depend on a continuously running virtual machine.
-- The project timeline and available AWS credits limit unnecessary infrastructure and service choices.
+- Use serverless managed AWS components and avoid continuously running compute.
+- All AWS resources and operating costs must be reviewed before deployment; budgets are alerts and do not stop resources.
+- Local review must not deploy resources. An operator must inspect the Terraform plan and state-management choices.
+- Lambda request processing and SQS are asynchronous for write operations; HTTP 202 means accepted by SQS, not committed to the ticket table.
+- The browser frontend is local-buildable but is not hosted or deployed by this Terraform configuration.
 
-## 3. Security Considerations
+## Security considerations
 
-- Use least-privilege IAM permissions where practical.
-- Do not use AWS root credentials for routine deployment.
-- Keep API access and authorization requirements explicit.
-- Validate incoming request data.
-- Avoid logging secrets or sensitive ticket contents.
-- Keep Terraform state files and credential files out of public version control.
+- API Gateway validates Cognito tokens. Lambdas require `sub` plus membership in `SupportUsers` or `Admins`.
+- Never trust a client-supplied `created_by`; perform ownership checks again in the asynchronous write path.
+- Keep IAM scoped to required tables, queues, SNS, API routes, and log groups.
+- Do not commit credentials, `.tfvars`, or Terraform state. Avoid logging tokens and ticket bodies.
 
-## 4. Out of Scope for the Initial Version
+## Operational limitations
 
-- User registration and full role-based access control.
-- Email or SMS notifications.
-- A graphical web interface.
-- Advanced analytics and dashboards.
-- Multi-Region disaster recovery.
-- Automated incident response.
+- A PENDING idempotency operation can be retried with the same key only when `last_error` identifies a definite SQS 4xx rejection. A `SUBMITTING` claim that survives five minutes is quarantined as AMBIGUOUS; inspect the operation, SQS queue/DLQ, ticket, and logs before manual recovery. Never create a new key or redrive blindly while the original acceptance is uncertain.
+- SNS and SQS SDK clients make one attempt to avoid hidden republishing. SNS 408/5xx, timeouts, connection errors, and stale claims are AMBIGUOUS and require evidence review. A worker crash after claim but before SNS publish may lose an email; a crash after publish may leave a delivered email marked AMBIGUOUS. The design prefers avoiding duplicates, and does not promise exactly-once or guaranteed delivery.
+- API Gateway `DEFAULT_4XX` and `DEFAULT_5XX` GatewayResponse CORS uses one static origin because response-parameter mapping cannot conditionally compare the incoming Origin against an allow-list. Terraform requires exactly one `frontend_allowed_origins` entry. Supporting multiple origins requires routing gateway errors through a component that can safely evaluate the allow-list.
+- DLQ message inspection increments receive count; message redrive/removal is an operator action.
+- Multi-Region disaster recovery and automated incident response are out of scope. Browser end-to-end tests against deployed AWS services are not implemented.
 
-These features may be considered future improvements if time and budget permit.
+## Cleanup
 
-## 5. Cost and Cleanup Plan
-
-- Check the estimated cost and configuration before creating resources.
-- Use only the AWS services required by the selected architecture.
-- Avoid unnecessary NAT Gateways and other continuously billed resources.
-- Review resources after testing.
-- Run Terraform destroy when the environment is no longer needed.
-- Verify that no project resources remain after cleanup.
-- Review the AWS Billing console for any remaining charges or usage.
+After an approved deployment, review and run `terraform destroy`, export data that must be retained, verify resources are removed, and check AWS Billing for charges already incurred.

@@ -61,3 +61,14 @@
 ## 8. Pricing Disclaimer
 
 This document identifies potential cost factors and is not a price quote. Actual costs depend on the AWS Region, service configuration, usage, current AWS pricing, and applicable account credits or free-tier terms. Credits do not guarantee that every resource or usage pattern is free.
+
+## 9. Services in the Current Implementation
+
+The initial comparison above focused on the core CRUD architecture. The implemented design additionally uses:
+
+- **Amazon Cognito:** User Pool authentication and `SupportUsers` / `Admins` groups.
+- **Amazon SQS FIFO and DLQ:** Asynchronous, per-ticket ordered writes and bounded retries.
+- **Amazon SNS:** Critical-ticket email and CloudWatch alarm notifications.
+- **AWS Budgets:** Actual-cost email alerts at USD 10, 25, and 50 against a USD 100 monthly budget.
+
+These services add costs and operational work. SNS email subscriptions require confirmation, DLQ messages need operator review, and budget alerts do not stop resources. See the current README for configuration and limitations.

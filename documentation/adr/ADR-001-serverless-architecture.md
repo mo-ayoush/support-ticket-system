@@ -33,6 +33,10 @@ The application will use:
 
 Terraform will be used to define and manage the AWS infrastructure.
 
+### Current implementation refinement
+
+The selected serverless architecture is implemented with Cognito, separate read/idempotency/write Lambdas, FIFO SQS and DLQ, four DynamoDB tables, SNS, CloudWatch alarms/dashboard, and AWS Budgets. Writes are asynchronous and transactional where DynamoDB supports atomicity. This elaborates the original three-service architecture decision without changing the selected serverless option.
+
 ## Alternatives Considered
 
 ### Architecture A – Serverless
