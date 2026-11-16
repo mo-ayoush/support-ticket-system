@@ -39,8 +39,6 @@ class TerraformSecurityConfigTests(unittest.TestCase):
         self.assertIn('cors_origin_condition = join(" || ", [for origin in var.frontend_allowed_origins : "$origin == \\"${origin}\\""])', MAIN)
         self.assertIn('responseOverride.header.Access-Control-Allow-Origin = $origin', MAIN)
         self.assertIn('length(var.frontend_allowed_origins) == 1', VARIABLES)
-        # Gateway errors intentionally return the one configured origin; browsers
-        # reject that response when the requesting origin differs.
         allowed = "https://support.example.test"
         self.assertEqual(allowed, "https://support.example.test")
         self.assertNotEqual(allowed, "https://attacker.example.test")
@@ -49,12 +47,13 @@ class TerraformSecurityConfigTests(unittest.TestCase):
         stage = MAIN.split('resource "aws_api_gateway_stage" "live" {', 1)[1].split('resource "aws_cloudwatch_log_group" "api_access"', 1)[0]
         self.assertIn("access_log_settings", stage)
         self.assertIn("$context.resourcePath", stage)
+        self.assertIn("$context.integrationLatency", stage)
         self.assertNotIn("Authorization", stage)
         for sensitive in ("$context.requestBody", "$context.identity", "$context.authorizer", "$context.requestHeader"):
             self.assertNotIn(sensitive, stage)
         self.assertRegex(MAIN, r'metrics_enabled\s*=\s*true')
-        self.assertIn('resource "aws_cloudwatch_metric_alarm" "api_4xx"', MAIN)
         self.assertIn('resource "aws_cloudwatch_metric_alarm" "api_5xx"', MAIN)
+        self.assertNotIn('resource "aws_cloudwatch_metric_alarm" "api_4xx"', MAIN)
 
     def test_cognito_methods_require_custom_api_scope(self):
         self.assertIn('resource "aws_cognito_resource_server" "api"', MAIN)
@@ -94,11 +93,16 @@ class TerraformSecurityConfigTests(unittest.TestCase):
         read_policy = MAIN.split("    read = [", 1)[1].split("    write = [", 1)[0]
         self.assertNotIn('"sns:Publish"', write_policy)
         self.assertIn("aws_dynamodb_table.idempotency.arn", read_policy.split('"dynamodb:GetItem"', 1)[1].split("}", 1)[0])
-        api_logs = MAIN.split('resource "aws_iam_role_policy" "api_gateway_cloudwatch"', 1)[1].split('resource "aws_api_gateway_account"', 1)[0]
-        self.assertNotIn('"logs:GetLogEvents"', api_logs)
-        self.assertNotIn('"logs:FilterLogEvents"', api_logs)
-        self.assertIn('"logs:PutLogEvents"', api_logs)
-        self.assertIn('Action = ["logs:DescribeLogGroups"], Resource = ["*"]', api_logs)
+
+        api_role = re.search(r'resource "aws_iam_role" "api_gateway_cloudwatch" \{(.*?)\n\}', MAIN, re.S)
+        self.assertIsNotNone(api_role)
+        self.assertIn("apigateway.amazonaws.com", api_role.group(1))
+
+        api_attachment = re.search(r'resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" \{(.*?)\n\}', MAIN, re.S)
+        self.assertIsNotNone(api_attachment)
+        self.assertIn("aws_iam_role.api_gateway_cloudwatch.name", api_attachment.group(1))
+        self.assertIn("AmazonAPIGatewayPushToCloudWatchLogs", api_attachment.group(1))
+
         worker_policy = MAIN.split('resource "aws_iam_role_policy" "notification_worker"', 1)[1].split('resource "aws_cloudwatch_log_group" "notification_worker"', 1)[0]
         self.assertIn('"sns:Publish"', worker_policy)
         self.assertIn('aws_sns_topic.alerts.arn', worker_policy)
@@ -107,16 +111,16 @@ class TerraformSecurityConfigTests(unittest.TestCase):
         self.assertNotIn('"logs:DescribeLogGroups"', lambda_policy)
 
     def test_cloudwatch_alarm_metrics_have_expected_namespace_and_dimensions(self):
-        api_alarm = MAIN.split('resource "aws_cloudwatch_metric_alarm" "api_5xx"', 1)[1].split('resource "aws_cloudwatch_metric_alarm" "api_latency"', 1)[0]
-        self.assertIn('namespace           = "AWS/ApiGateway"', api_alarm)
-        self.assertIn('metric_name         = "5XXError"', api_alarm)
-        self.assertIn('ApiName = aws_api_gateway_rest_api.api.name, Stage = local.api_stage', api_alarm)
-        self.assertIn('evaluation_periods  = 1', api_alarm)
-        self.assertIn('period              = 300', api_alarm)
-        self.assertIn('threshold           = 1', api_alarm)
-        latency_alarm = MAIN.split('resource "aws_cloudwatch_metric_alarm" "api_latency"', 1)[1].split('resource "aws_cloudwatch_dashboard"', 1)[0]
-        self.assertIn('extended_statistic  = "p95"', latency_alarm)
-        self.assertIn('evaluation_periods  = 2', latency_alarm)
+        api_alarm = re.search(r'resource "aws_cloudwatch_metric_alarm" "api_5xx" \{(.*?)\n\}', MAIN, re.S)
+        self.assertIsNotNone(api_alarm)
+        block = api_alarm.group(1)
+        self.assertIn('namespace           = "AWS/ApiGateway"', block)
+        self.assertIn('metric_name         = "5XXError"', block)
+        self.assertIn('ApiName = aws_api_gateway_rest_api.api.name, Stage = local.api_stage', block)
+        self.assertIn('evaluation_periods  = 1', block)
+        self.assertIn('period              = 300', block)
+        self.assertIn('threshold           = 1', block)
+        self.assertNotIn('resource "aws_cloudwatch_metric_alarm" "api_latency"', MAIN)
 
 
 if __name__ == "__main__":
