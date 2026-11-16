@@ -31,7 +31,7 @@ Required fields are `ticket_id`, `title`, `description`, `priority`, `status`, `
 - Least-privilege IAM, encrypted storage/queues, Cognito-protected API, no committed credentials.
 - Scale without manually managed servers, with FIFO ordering per ticket and parallelism across tickets.
 - Meaningful failure handling, idempotent retries, optimistic concurrency, a DLQ, and a documented manual notification-recovery policy.
-- 14-day Lambda log retention and CloudWatch alarms/dashboard.
+- 7-day Lambda and API Gateway access log retention, with CloudWatch alarms and dashboard.
 - Maintainable Python/Terraform code, repeatable packaging and planning, and local test support.
 
 ## Test requirements
