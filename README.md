@@ -142,11 +142,11 @@ npm run build
 npm run dev
 ```
 
-The full automated test suite completed with **52 passed and 0 failed** using `python -m pytest -q`. These tests include application tests using AWS mocks and Terraform security configuration tests.
+The Python automated test suite completed with **52 passed and 0 failed** using `python -m pytest -q`. The frontend Vitest suite completed with **19 passed and 0 failed** using `npm run test`. The frontend production build also completed successfully using `npm run build`. Combined, both automated test suites have **71 passed and 0 failed**. Python application tests use AWS mocks; the frontend tests run locally.
 
 ## Known limits and human review
 
-- No load test has been performed. Manual end-to-end CRUD was verified against the deployed AWS API; the full pytest suite completed with 52 passed and 0 failed. Application tests use AWS mocks.
+- No load test has been performed. Manual end-to-end CRUD was verified against the deployed AWS API. The Python suite has 52 passing tests and the frontend suite has 19 passing tests. Python application tests use AWS mocks.
 - AMBIGUOUS SNS records require manual review after checking CloudWatch and SNS evidence. The worker never automatically republishes them; manually changing an ambiguous record to retryable could duplicate an email.
 - DLQ inspection through the API performs SQS ReceiveMessage with visibility timeout zero; it leaves messages available but increments their receive count. Redrive/removal remains an operator action.
 - Request status and audit pagination tokens are base64-encoded cursors, not cryptographic signatures. Handlers validate that cursor partition keys match the authorized user/ticket.

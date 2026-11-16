@@ -1,3 +1,52 @@
+## Frontend Automated Tests
+
+The frontend automated test suite was executed locally using Vitest.
+
+**Command:**
+```bash
+cd frontend
+npm run test
+```
+
+**Result:**
+- 19 tests passed
+- 0 tests failed
+- 5 test files passed
+
+Test coverage includes:
+- API service behaviour
+- Operation persistence and recovery
+- Retry handling and duplicate submission prevention
+- Authentication behaviour
+- UI component behaviour
+
+## Frontend Production Build
+
+The frontend production build was verified successfully.
+
+**Command:**
+```bash
+cd frontend
+npm run build
+```
+
+**Result:**
+- TypeScript compilation successful
+- 2,188 modules transformed
+- Vite production build completed successfully
+
+## Combined Automated Test Results
+
+| Test suite | Passed | Failed |
+|---|---:|---:|
+| Python / Backend | 52 | 0 |
+| Frontend / Vitest | 19 | 0 |
+| **Total** | **71** | **0** |
+
+Note: These are results from two separate test suites, executed with their respective commands.
+
+---
+
 # Testing Results
 
 ## 1. Automated Test Suite
@@ -61,6 +110,6 @@ Additional evidence for live AWS error scenarios and CloudWatch logging has not 
 
 ## 4. Conclusion
 
-The full automated test suite completed successfully, with 52 passing tests and no failures.
+The Python automated test suite completed with 52 passing tests and no failures. The frontend Vitest suite completed with 19 passing tests and no failures, for a combined total of 71 passing tests across both suites.
 
 The main ticket management operations were also manually tested through the deployed AWS application.
