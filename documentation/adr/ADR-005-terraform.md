@@ -111,3 +111,13 @@ The project will follow this workflow:
 Terraform was selected because it allows the AWS infrastructure to be defined, reviewed, reproduced, and managed as code.
 
 This supports the project's requirements for reproducibility, maintainability, and controlled infrastructure deployment.
+
+## Implementation Evidence
+
+Terraform was used to deploy and manage the project's AWS infrastructure.
+
+The configuration is organized into Terraform files, including `main.tf`, `variables.tf`, and `outputs.tf`.
+
+The infrastructure was initialized, validated, planned, and applied during deployment. The final cleanup will use `terraform destroy` after the project demonstration.
+
+Terraform state files and sensitive variable files are excluded from Git using `.gitignore`.

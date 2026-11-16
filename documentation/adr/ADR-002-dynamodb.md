@@ -58,6 +58,27 @@ Example:
 }
 ```
 
+### Supporting DynamoDB Tables
+
+The implementation uses four DynamoDB tables:
+
+| Table | Purpose |
+|---|---|
+| Tickets | Stores ticket details and supports user/admin ticket queries through secondary indexes. |
+| Idempotency | Tracks write requests to prevent duplicate operations. TTL removes expired records. |
+| Audit | Stores ticket history and audit events. |
+| Notifications | Stores notification outbox records and tracks their delivery status. |
+
+All four tables use on-demand billing (`PAY_PER_REQUEST`) and server-side encryption.
+
+The tickets table uses `ticket_id` as its partition key. It also has two Global Secondary Indexes:
+- `UserTicketsIndex`: supports listing tickets by `created_by`.
+- `AdminTicketsIndex`: supports listing tickets through `admin_partition`.
+
+The notification table uses `NotificationStatusIndex` to find notification records by status and creation time.
+
+Ticket deletion is implemented as a soft delete: the ticket status changes to `DELETED` instead of physically removing the item from DynamoDB.
+
 ## Alternatives Considered
 
 ### Option A – Amazon DynamoDB

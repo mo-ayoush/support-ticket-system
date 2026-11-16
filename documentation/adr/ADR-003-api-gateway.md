@@ -32,6 +32,9 @@ The planned API endpoints are:
 | GET | `/tickets/{ticket_id}` | Retrieve a ticket by ID |
 | PUT | `/tickets/{ticket_id}` | Update a ticket |
 | DELETE | `/tickets/{ticket_id}` | Delete a ticket |
+| GET | `/tickets/{ticket_id}/audit` | Retrieve ticket audit history (Admin only) |
+| GET | `/requests/{operation_id}` | Retrieve the status of a write operation |
+| GET | `/admin/dlq` | Inspect dead-letter queue messages (Admin only) |
 
 The Python Lambda application will handle request validation, business logic, DynamoDB operations, and response generation.
 

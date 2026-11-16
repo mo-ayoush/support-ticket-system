@@ -27,7 +27,14 @@ The Python application will run inside Lambda and handle:
 - Handling application errors.
 - Returning appropriate HTTP status codes and JSON responses.
 
-The current implementation splits these responsibilities into Python 3.12 Idempotency, Write, and Read Lambdas, with shared validation and response helpers.
+The implementation uses four Python 3.12 Lambda functions:
+
+- **Idempotency Lambda:** Receives create, update, and delete requests, validates idempotency keys, and submits accepted write operations to SQS FIFO.
+- **Write Lambda:** Processes queued write messages and performs transactional DynamoDB operations, including ticket changes, audit records, and operation completion.
+- **Read Lambda:** Handles ticket listing, ticket retrieval, operation status, audit history, and administrative DLQ inspection.
+- **Notification Worker Lambda:** Processes pending notification outbox records and publishes alerts through SNS. It is also triggered periodically by EventBridge to retry eligible notifications.
+
+Shared Python modules provide common validation, authorization, and response-handling functionality.
 
 ## Alternatives Considered
 

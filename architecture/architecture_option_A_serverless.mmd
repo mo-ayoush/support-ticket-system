@@ -1,0 +1,115 @@
+flowchart LR
+  subgraph CLIENT[Client]
+    UI[React + TypeScript + Vite<br/>Browser frontend<br/>Hosting is outside Terraform]
+  end
+
+  TF[Terraform<br/>Infrastructure as Code]
+
+  subgraph AWS[AWS account · region configured in Terraform]
+    subgraph AUTHAPI[Authentication and synchronous API]
+      COG[Cognito User Pool<br/>Managed sign-in]
+      APIGW[API Gateway REST API<br/>Cognito User Pool authorizer<br/>Protected routes]
+    end
+
+    subgraph FUNCTIONS[Lambda functions]
+      IDEM[Idempotency Lambda<br/>Validate request · claim key<br/>Submit accepted writes]
+      READ[Read Lambda<br/>Tickets · operation status<br/>Audit · admin DLQ inspection]
+      WRITE[Write Lambda<br/>Consume FIFO messages<br/>Transactional DynamoDB writes]
+      NOTIFY[Notification Worker Lambda<br/>Process outbox records<br/>Publish SNS notifications]
+    end
+
+    subgraph QUEUES[Asynchronous processing]
+      FIFO[SQS FIFO queue<br/>Ticket-group ordering]
+      DLQ[SQS FIFO Dead Letter Queue<br/>Redrive after 3 failed receives]
+      SCHEDULE[EventBridge scheduled rule<br/>Every 1 minute]
+    end
+
+    subgraph DATA[DynamoDB tables]
+      TICKETS[(Tickets)]
+      IDEMP[(Idempotency)]
+      AUDIT[(Audit)]
+      OUTBOX[(Notifications outbox)]
+    end
+
+    SNS[SNS alerts topic<br/>Critical-ticket notifications]
+    ADMIN[SNS email subscriber<br/>var.admin_email]
+    BUDGET_EMAIL[Budget email subscriber<br/>var.budget_email]
+    CWLOGS[CloudWatch Logs<br/>API access + all Lambda logs]
+    CWMETRICS[CloudWatch Metrics<br/>AWS service metrics available: Lambda · API Gateway · SQS · DynamoDB<br/>Includes standard service metrics and the custom notification metric]
+    CWALERTS[CloudWatch Alarms · 5 configured categories<br/>Lambda errors · DLQ visible messages<br/>Notification Worker errors · ambiguous outbox<br/>API Gateway 5XX errors]
+    CWDASH[CloudWatch Dashboard widgets<br/>Lambda activity: Idempotency · Read · Write<br/>Invocations · Errors · Duration; Worker excluded<br/>Notification Worker has separate Errors alarm<br/>Queues: Writes + DLQ visible messages<br/>DynamoDB: Tickets consumed read/write only]
+    BUDGET[AWS Budgets<br/>Actual cost notifications]
+  end
+
+  UI -->|OAuth 2.0 authorization code + PKCE| COG
+  COG -->|Access token| UI
+  UI -->|HTTPS REST request + bearer token| APIGW
+  APIGW -.->|Authorizer validates token against pool| COG
+  APIGW -->|POST / PUT / DELETE| IDEM
+  APIGW -->|Ticket reads · status · audit · admin DLQ| READ
+
+  IDEM -->|Conditional idempotency claim| IDEMP
+  IDEM -->|Target ownership / existence lookup| TICKETS
+  IDEM -->|Accepted operation| FIFO
+  FIFO -->|Lambda event source mapping| WRITE
+  FIFO -->|Redrive after repeated failures| DLQ
+  READ -->|Get / Query| TICKETS
+  READ -->|Exact operation status| IDEMP
+  READ -->|Audit history| AUDIT
+  READ -->|Admin inspection| DLQ
+  WRITE -->|Transactional ticket mutation| TICKETS
+  WRITE -->|Transactional completion state| IDEMP
+  WRITE -->|Transactional audit event| AUDIT
+  WRITE -->|Transactional outbox intent when required| OUTBOX
+
+  SCHEDULE -->|Scheduled invocation| NOTIFY
+  NOTIFY -->|Query / update pending outbox records| OUTBOX
+  NOTIFY -->|Publish notification| SNS
+  SNS -->|Email subscription| ADMIN
+  CWALERTS -->|Alarm actions| SNS
+  BUDGET -->|Actual cost notifications| BUDGET_EMAIL
+
+  APIGW -.->|Access logs| CWLOGS
+  IDEM -.->|Logs| CWLOGS
+  READ -.->|Logs| CWLOGS
+  WRITE -.->|Logs| CWLOGS
+  NOTIFY -.->|Logs| CWLOGS
+  APIGW -.-> CWMETRICS
+  IDEM -.-> CWMETRICS
+  READ -.-> CWMETRICS
+  WRITE -.-> CWMETRICS
+  NOTIFY -.-> CWMETRICS
+  FIFO -.-> CWMETRICS
+  DLQ -.-> CWMETRICS
+  TICKETS -.-> CWMETRICS
+  IDEMP -.-> CWMETRICS
+  AUDIT -.-> CWMETRICS
+  OUTBOX -.-> CWMETRICS
+  CWMETRICS --> CWALERTS
+  CWMETRICS -->|selected widget metrics only| CWDASH
+  IDEM -.-> CWDASH
+  READ -.-> CWDASH
+  WRITE -.-> CWDASH
+  FIFO -.-> CWDASH
+  DLQ -.-> CWDASH
+  TICKETS -.-> CWDASH
+
+  TF -.->|Creates and configures AWS resources| AWS
+
+  classDef client fill:#eef4fb,stroke:#52708f,color:#172b43,stroke-width:2px;
+  classDef auth fill:#d9ebff,stroke:#3b78a8,color:#12334e,stroke-width:2px;
+  classDef lambda fill:#e6f4e9,stroke:#4b8a5a,color:#183b22,stroke-width:2px;
+  classDef queue fill:#fff0d6,stroke:#bd791b,color:#55340b,stroke-width:2px;
+  classDef database fill:#fff4d8,stroke:#a9791d,color:#4c350a,stroke-width:2px;
+  classDef monitoring fill:#f0e8fa,stroke:#8060a3,color:#322247,stroke-width:2px;
+  classDef external fill:#f3f4f6,stroke:#667085,color:#26303d,stroke-width:2px;
+  classDef iac fill:#fce8e6,stroke:#b65b4e,color:#52251f,stroke-width:2px;
+
+  class UI client;
+  class COG,APIGW auth;
+  class IDEM,READ,WRITE,NOTIFY lambda;
+  class FIFO,DLQ,SCHEDULE queue;
+  class TICKETS,IDEMP,AUDIT,OUTBOX database;
+  class CWLOGS,CWMETRICS,CWALERTS,CWDASH,BUDGET monitoring;
+  class SNS,ADMIN external;
+  class TF iac;
