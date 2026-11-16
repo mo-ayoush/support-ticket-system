@@ -142,11 +142,11 @@ npm run build
 npm run dev
 ```
 
-The selected pytest command completed with **43 passed**; these tests use AWS mocks. Three older tests in `tests/test_terraform_security_config.py` failed and were not changed, so this result does not mean the full test suite passes. Terraform planning needs the Lambda ZIPs because Terraform calculates their hashes. Review the plan and IAM policies before future changes or redeployment. To clean up an approved deployment, inspect and then run `terraform destroy` with the same variable values; export any data to retain first.
+The full automated test suite completed with **52 passed and 0 failed** using `python -m pytest -q`. These tests include application tests using AWS mocks and Terraform security configuration tests.
 
 ## Known limits and human review
 
-- No load test has been performed. Manual end-to-end CRUD was verified against the deployed AWS API; the selected pytest suite uses mocks, and three older Terraform security configuration tests remain failing.
+- No load test has been performed. Manual end-to-end CRUD was verified against the deployed AWS API; the full pytest suite completed with 52 passed and 0 failed. Application tests use AWS mocks.
 - AMBIGUOUS SNS records require manual review after checking CloudWatch and SNS evidence. The worker never automatically republishes them; manually changing an ambiguous record to retryable could duplicate an email.
 - DLQ inspection through the API performs SQS ReceiveMessage with visibility timeout zero; it leaves messages available but increments their receive count. Redrive/removal remains an operator action.
 - Request status and audit pagination tokens are base64-encoded cursors, not cryptographic signatures. Handlers validate that cursor partition keys match the authorized user/ticket.

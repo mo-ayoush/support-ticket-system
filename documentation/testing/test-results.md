@@ -1,20 +1,22 @@
 # Testing Results
 
-## 1. Automated Application Tests
+## 1. Automated Test Suite
 
-The application tests were executed locally using Python and `pytest`.
+The full automated test suite was executed locally using Python and `pytest`.
 
 **Command:**
 ```bash
-python -m pytest -q tests/test_common.py tests/test_lambda_handlers.py
+python -m pytest -q
 ```
 
 **Result:**
-- 43 tests passed
+- 52 tests passed
 - 0 tests failed
-- Execution time: 0.11 seconds
+- Execution time: 0.14 seconds
 
-These tests use in-memory AWS SDK mocks to test application logic without accessing real AWS resources.
+The suite includes application tests and Terraform security configuration tests.
+
+The application tests use in-memory AWS SDK mocks to test application logic without accessing real AWS resources.
 
 Test coverage includes:
 - Input validation and invalid requests
@@ -25,6 +27,7 @@ Test coverage includes:
 - SQS and SNS error handling
 - Notification worker behaviour
 - Audit and operation status handling
+- Terraform security configuration checks
 
 ## 2. Manual End-to-End Tests
 
@@ -50,12 +53,14 @@ The application was deployed on AWS and tested through its user interface.
 
 ## 3. Testing Limitations
 
-The automated tests use mocked AWS clients. They verify application logic but do not replace tests against live AWS services.
+The automated application tests use mocked AWS clients. They verify application logic but do not replace tests against live AWS services.
 
-Additional evidence for live AWS error scenarios and CloudWatch logging will be documented separately.
+Manual CRUD testing confirms the main ticket management flow, but does not establish load capacity or cover every AWS failure and recovery scenario.
+
+Additional evidence for live AWS error scenarios and CloudWatch logging has not yet been fully documented.
 
 ## 4. Conclusion
 
-The selected automated application test suites completed successfully, with 43 passing tests and no failures.
+The full automated test suite completed successfully, with 52 passing tests and no failures.
 
 The main ticket management operations were also manually tested through the deployed AWS application.
