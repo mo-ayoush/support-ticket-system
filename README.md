@@ -11,7 +11,8 @@ Client -> API Gateway + Cognito -> Read Lambda -> DynamoDB (read)
 Client -> API Gateway + Cognito -> Idempotency Lambda -> IdempotencyRecords -> SQS FIFO
                                                               SQS FIFO -> Write Lambda -> DynamoDB transaction
 Notification outbox -> scheduled worker -> SNS critical email
-CloudWatch alarms and AWS Budget notifications -> SNS email subscription
+CloudWatch alarms -> SNS alerts topic -> admin email subscriber
+AWS Budget actual-cost notifications -> budget_email subscriber
 React + TypeScript + Vite -> Cognito managed login (authorization code + PKCE)
 React API client -> API Gateway (Cognito access token; configured CORS origins)
 ```
@@ -77,9 +78,9 @@ The main FIFO queue uses batch size 1, a 180-second visibility timeout, four-day
 
 ## Monitoring and costs
 
-Lambda log groups retain 14 days; API Gateway access logs retain 30 days. Access logs contain request ID, timestamp, method, templated resource path, status, response length, and integration latency; they omit authorization headers, query values, request/response bodies, and identity claims. API Gateway method metrics are enabled with execution data tracing disabled. CloudWatch alarms cover Lambda errors/throttles, API 4XX/5XX/latency, outbox worker errors, and visible DLQ messages. The dashboard displays Lambda activity, queue depth, and DynamoDB capacity. Lambda roles are scoped by table, queue, topic, and log group; the API Gateway logging role omits log-event read actions and retains only the `DescribeLogGroups` metadata permission required by the service. API Gateway’s managed GatewayResponse supports static CORS header mapping, so Terraform requires exactly one frontend origin and uses that value for gateway-generated errors. Multi-origin deployments need a different error-response architecture to preserve per-origin allow-list checks.
+Lambda and API Gateway access log groups retain 7 days. Access logs contain request ID, timestamp, method, templated resource path, status, response length, and integration latency; they omit authorization headers, query values, request/response bodies, and identity claims. API Gateway method metrics are enabled with execution data tracing disabled. Five alarm categories are configured: Lambda errors for Idempotency, Write, and Read; visible messages in the DLQ; Notification Worker errors; ambiguous notification outbox events; and API Gateway 5XX errors. The CloudWatch Dashboard's Lambda activity widget covers only Idempotency, Write, and Read; the Notification Worker has its own error alarm but is not in that widget. Its queue widget shows the Writes queue and DLQ, and its DynamoDB capacity widget shows consumed read/write capacity for the Tickets table only. CloudWatch service metrics are available beyond those dashboard widgets. Lambda roles are scoped by table, queue, topic, and log group; the API Gateway logging role uses the AWS managed API Gateway CloudWatch Logs push policy. API Gateway’s managed GatewayResponse supports static CORS header mapping, so Terraform requires exactly one frontend origin and uses that value for gateway-generated errors. Multi-origin deployments need a different error-response architecture to preserve per-origin allow-list checks.
 
-The monthly AWS Budget defaults to USD 100 with actual-cost alerts at USD 10, 25, and 50. Budget notifications are alerts only: they do not stop resources or prevent additional charges. Email subscription confirmation is required after deployment.
+The monthly AWS Budget defaults to USD 10 with actual-cost notifications at USD 5, 8, and 10. Budget notifications are alerts only: they do not stop resources or prevent additional charges. Email subscription confirmation is required for the configured recipients.
 
 ## Repository structure
 
@@ -108,23 +109,30 @@ The API layer is centralized in `frontend/src/services/api.ts` and uses typed re
 
 Configure `frontend/.env.local` from `frontend/.env.example` using Terraform outputs for API URL, user pool, client, hosted UI domain, and API OAuth scope. Cognito callback/logout URL defaults target `http://localhost:5173/`; Terraform permits HTTP only for localhost/127.0.0.1 and requires HTTPS for all other callback, logout, and CORS URLs. Set matching production URLs before deployment. `cognito_domain_prefix` must be globally unique. No frontend hosting or deployment is configured.
 
-## Setup, test, and infrastructure review
+## Deployment and integration verification
 
-Prerequisites: Python 3.12, pip, Node.js >= 20.19 (or >= 22.12), npm, Terraform >= 1.5, `zip`, and network access to npm and Terraform Registry. AWS credentials are only needed for a later plan against AWS; this project review does not deploy anything.
+Terraform was successfully initialized, validated, planned, and applied. The React frontend was connected to the deployed AWS API. Manual end-to-end CRUD checks against AWS succeeded: CREATE, READ/list, and UPDATE worked, and DELETE completed as a soft delete, leaving the ticket marked as deleted.
+
+These AWS checks are separate from the selected pytest unit tests below, which use mocks and do not call live AWS services. The verified manual CRUD flow does not establish load capacity or cover every AWS failure and recovery path.
+
+## Setup, tests, and infrastructure workflow
+
+Prerequisites: Python 3.12, pip, Node.js >= 20.19 (or >= 22.12), npm, Terraform >= 1.5, `zip`, and network access to npm and Terraform Registry. AWS credentials are required for AWS-backed Terraform planning and deployment.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-python3 -m unittest discover -s tests -v
+python -m pytest -q tests/test_common.py tests/test_lambda_handlers.py
 ./scripts/package_lambdas.sh
 cd terraform
 terraform init
 terraform fmt -check -recursive
 terraform validate
 cp terraform.tfvars.example terraform.tfvars
-# Set monitored email addresses and a globally unique Cognito domain prefix.
+# Set email addresses, callback URLs, and a globally unique Cognito domain prefix.
 terraform plan
+terraform apply
 cd ../frontend
 npm ci
 cp .env.example .env.local
@@ -134,12 +142,12 @@ npm run build
 npm run dev
 ```
 
-Terraform planning needs the Lambda ZIPs because Terraform calculates their hashes. Review the plan and IAM policies before any deployment. No `terraform apply` has been run. To clean up an approved deployment, inspect and then run `terraform destroy` with the same variable values; export any data to retain first.
+The selected pytest command completed with **43 passed**; these tests use AWS mocks. Three older tests in `tests/test_terraform_security_config.py` failed and were not changed, so this result does not mean the full test suite passes. Terraform planning needs the Lambda ZIPs because Terraform calculates their hashes. Review the plan and IAM policies before future changes or redeployment. To clean up an approved deployment, inspect and then run `terraform destroy` with the same variable values; export any data to retain first.
 
 ## Known limits and human review
 
-- No load test, live AWS integration test, or production deployment has been performed. The frontend is implemented, but end-to-end browser testing against a deployed Cognito pool/API has not been performed.
+- No load test has been performed. Manual end-to-end CRUD was verified against the deployed AWS API; the selected pytest suite uses mocks, and three older Terraform security configuration tests remain failing.
 - AMBIGUOUS SNS records require manual review after checking CloudWatch and SNS evidence. The worker never automatically republishes them; manually changing an ambiguous record to retryable could duplicate an email.
 - DLQ inspection through the API performs SQS ReceiveMessage with visibility timeout zero; it leaves messages available but increments their receive count. Redrive/removal remains an operator action.
 - Request status and audit pagination tokens are base64-encoded cursors, not cryptographic signatures. Handlers validate that cursor partition keys match the authorized user/ticket.
-- Admin group membership is managed outside this Terraform configuration. Email subscriptions must be confirmed. Review Cognito token use, IAM permissions, cost estimates, quotas, API behavior, and recovery runbooks before deployment.
+- Admin group membership is managed outside this Terraform configuration. Email subscriptions require recipient confirmation. Review Cognito token use, IAM permissions, cost estimates, quotas, API behavior, and recovery runbooks before future deployments or infrastructure changes.
