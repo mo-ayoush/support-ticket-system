@@ -12,7 +12,7 @@ The review identifies implemented practices, current limitations, and possible i
 
 - Infrastructure is defined and managed using Terraform.
 - Application logs are configured through Amazon CloudWatch.
-- CloudWatch dashboards and alarms provide operational visibility.
+- The CloudWatch operations dashboard provides five monitoring widgets covering core Lambda activity, SQS queues, DynamoDB capacity, Notification Worker metrics, and API Gateway 4XX/5XX errors. Seven CloudWatch alarms provide additional monitoring. The dashboard enhancement was deployed using a dedicated least-privilege IAM user and verified against live AWS.
 - Application responsibilities are separated across multiple Lambda functions.
 - Automated tests are used to verify application logic.
 
@@ -21,6 +21,7 @@ The review identifies implemented practices, current limitations, and possible i
 - Operational procedures are not yet fully automated.
 - Production deployments should include a documented rollback procedure.
 - Monitoring alerts should have documented response procedures.
+- The DLQ alarm was observed in `INSUFFICIENT_DATA` during the live AWS review; missing metric data and alarm behaviour require further validation.
 
 ## 3. Security
 

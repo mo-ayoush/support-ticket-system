@@ -702,9 +702,42 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = "${local.prefix}-operations"
   dashboard_body = jsonencode({ widgets = [
-    { type = "metric", x = 0, y = 0, width = 12, height = 6, properties = { metrics = concat([for f in local.functions : ["AWS/Lambda", "Invocations", "FunctionName", aws_lambda_function.app[f].function_name]], [for f in local.functions : ["AWS/Lambda", "Errors", "FunctionName", aws_lambda_function.app[f].function_name]], [for f in local.functions : ["AWS/Lambda", "Duration", "FunctionName", aws_lambda_function.app[f].function_name]]), period = 300, region = var.aws_region, title = "Lambda activity" } },
+    { type = "metric", x = 0, y = 0, width = 12, height = 6, properties = { metrics = concat([for f in local.functions : ["AWS/Lambda", "Invocations", "FunctionName", "${local.prefix}-${f}"]], [for f in local.functions : ["AWS/Lambda", "Errors", "FunctionName", "${local.prefix}-${f}"]], [for f in local.functions : ["AWS/Lambda", "Duration", "FunctionName", "${local.prefix}-${f}"]]), period = 300, region = var.aws_region, title = "Lambda activity" } },
     { type = "metric", x = 12, y = 0, width = 12, height = 6, properties = { metrics = [["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.writes.name], [".", ".", ".", aws_sqs_queue.dlq.name]], period = 300, region = var.aws_region, title = "Queues" } },
-    { type = "metric", x = 0, y = 6, width = 12, height = 6, properties = { metrics = [["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.tickets.name], [".", "ConsumedWriteCapacityUnits", ".", "."]], period = 300, region = var.aws_region, title = "DynamoDB capacity" } }
+    { type = "metric", x = 0, y = 6, width = 12, height = 6, properties = { metrics = [["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", aws_dynamodb_table.tickets.name], [".", "ConsumedWriteCapacityUnits", ".", "."]], period = 300, region = var.aws_region, title = "DynamoDB capacity" } },
+    {
+      type   = "metric"
+      x      = 12
+      y      = 6
+      width  = 12
+      height = 6
+      properties = {
+        title  = "Notification Worker"
+        region = var.aws_region
+        period = 300
+        metrics = [
+          ["AWS/Lambda", "Invocations", "FunctionName", "${local.prefix}-notification-worker", { stat = "Sum" }],
+          ["AWS/Lambda", "Errors", "FunctionName", "${local.prefix}-notification-worker", { stat = "Sum" }],
+          ["AWS/Lambda", "Duration", "FunctionName", "${local.prefix}-notification-worker", { stat = "Average" }]
+        ]
+      }
+    },
+    {
+      type   = "metric"
+      x      = 0
+      y      = 12
+      width  = 12
+      height = 6
+      properties = {
+        title  = "API Gateway Errors"
+        region = var.aws_region
+        period = 300
+        metrics = [
+          ["AWS/ApiGateway", "4XXError", "ApiName", aws_api_gateway_rest_api.api.name, "Stage", local.api_stage, { stat = "Sum" }],
+          ["AWS/ApiGateway", "5XXError", "ApiName", aws_api_gateway_rest_api.api.name, "Stage", local.api_stage, { stat = "Sum" }]
+        ]
+      }
+    }
   ] })
 }
 resource "aws_budgets_budget" "monthly" {

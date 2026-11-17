@@ -34,6 +34,18 @@ The application uses AWS managed services and follows the principle of least pri
 - API and Lambda monitoring helps identify operational errors.
 - CloudWatch alarms are configured for selected failure conditions.
 
+### Live AWS Verification (17 November 2026)
+
+A read-only review in `eu-central-1` confirmed:
+
+- **CloudWatch Alarms:** 7 alarms were present; 6 were in `OK` state and the DLQ alarm was in `INSUFFICIENT_DATA`.
+- **CloudWatch Logs:** 6 log groups were present. The 4 application Lambda log groups and the API Gateway access log group had 7-day retention.
+- **Retention exception:** `/aws/apigateway/welcome` had no explicit retention configured and should be reviewed before production use.
+- **CloudWatch Dashboard:** The initial review found 3 widgets covering Lambda activity, SQS queues, and DynamoDB capacity. Later on 17 November 2026, two additional widgets were deployed for Notification Worker metrics and API Gateway 4XX/5XX errors, bringing the total to 5. The deployment used a dedicated IAM user with permissions limited to the operations dashboard, and the updated widget count was verified directly through AWS.
+- **Monitoring limitation:** An alarm in `OK` state does not necessarily indicate that no errors occurred, particularly when missing data is treated as `notBreaching`.
+
+Detailed historical API and Lambda error evidence is documented in `documentation/testing/test-results.md`.
+
 ## 6. Security Strengths
 
 - Centralized authentication through Cognito.

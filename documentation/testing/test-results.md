@@ -106,9 +106,55 @@ The automated application tests use mocked AWS clients. They verify application 
 
 Manual CRUD testing confirms the main ticket management flow, but does not establish load capacity or cover every AWS failure and recovery scenario.
 
-Additional evidence for live AWS error scenarios and CloudWatch logging has not yet been fully documented.
+Selected live AWS error scenarios and CloudWatch evidence are documented in Section 4. Further end-to-end failure and recovery testing remains necessary.
 
-## 4. Conclusion
+## 4. Live AWS CloudWatch Evidence Review
+
+A read-only review of deployed AWS resources and CloudWatch logs was performed on 17 November 2026 in the `eu-central-1` region.
+
+### Monitoring Resources
+
+The review identified:
+
+- 7 CloudWatch alarms: 6 in `OK` state and 1 in `INSUFFICIENT_DATA` state.
+- 6 CloudWatch Log Groups.
+- 1 CloudWatch operations dashboard containing 3 widgets at the time of the initial review.
+
+**Monitoring improvement deployed on 17 November 2026:** The operations dashboard was updated from 3 to 5 widgets. The existing Lambda activity, SQS queues, and DynamoDB capacity widgets were retained. Two widgets were added:
+
+- **Notification Worker:** Lambda invocations, errors, and average duration.
+- **API Gateway Errors:** HTTP 4XX and 5XX error metrics for stage `v1`.
+
+The update was deployed using a dedicated, limited-permission IAM user through the AWS CLI, without deploying Lambda or API Gateway changes. A subsequent AWS `GetDashboard` check confirmed that all 5 widgets were present.
+
+The DLQ alarm was in `INSUFFICIENT_DATA` with no recent metric datapoints available during the review. An `OK` alarm state does not necessarily prove the absence of errors when missing data is configured as `notBreaching`.
+
+Five application-related Log Groups had a 7-day retention period. The additional `/aws/apigateway/welcome` Log Group had no explicit retention period configured.
+
+### API Gateway Error Evidence
+
+CloudWatch access logs from 15 November 2026 contained the following events in the retrieved samples:
+
+- 6 HTTP 403 responses for `GET /tickets`.
+- 3 HTTP 404 responses for `GET /requests/{operation_id}`.
+- 8 HTTP 500 responses for `GET /tickets`.
+- 1 HTTP 500 response for `POST /tickets`.
+
+These observations are based on filtered log samples and are not exhaustive request counts.
+
+### Lambda Error Investigation
+
+**Read Lambda:** CloudWatch logs showed an `AttributeError` caused by calling `.get()` on a null `pathParameters` value. Inspection of the currently deployed Lambda package confirmed that the code now uses `event.get("pathParameters") or {}`.
+
+**Idempotency Lambda:** The HTTP 500 response for `POST /tickets` at 13:01:55 UTC on 15 November 2026 corresponded to an `AttributeError` recorded by the Idempotency Lambda. The currently deployed package also handles null `pathParameters` safely. However, the precise cause of this historical error remains unconfirmed because the available log entry did not contain a traceback.
+
+Both Lambda functions were updated after their respective historical errors.
+
+### Review Limitations
+
+This review inspected deployed configurations, code packages, and selected CloudWatch logs. It did not modify AWS resources, execute new end-to-end API tests, verify notification delivery, or establish that all historical errors have been resolved.
+
+## 5. Conclusion
 
 The Python automated test suite completed with 52 passing tests and no failures. The frontend Vitest suite completed with 19 passing tests and no failures, for a combined total of 71 passing tests across both suites.
 
