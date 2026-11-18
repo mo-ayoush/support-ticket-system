@@ -1,0 +1,72 @@
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Arial, sans-serif","fontSize":"18px","primaryTextColor":"#172b43","lineColor":"#53657a","clusterBkg":"#f8fafc","clusterBorder":"#b9c6d3","edgeLabelBackground":"#ffffff","tertiaryColor":"#ffffff"},"flowchart":{"curve":"basis","nodeSpacing":14,"rankSpacing":22,"htmlLabels":true,"padding":5}}}%%
+flowchart TB
+  subgraph ROW1["01 · REQUEST · FRONTEND / AUTH / API"]
+    direction LR
+    UI["Frontend · React / TypeScript / Vite<br/>Bearer-token REST client"]
+    COG["Cognito User Pool · OAuth<br/>Authorization code · tickets scope"]
+    API["API Gateway REST API<br/>Cognito authorizer · scope validation<br/>Ticket CRUD · status · audit · admin DLQ"]
+    IDEM["Idempotency Lambda<br/>DynamoDB claim<br/>Accepted ticket writes → SQS"]
+    READ["Read Lambda<br/>DynamoDB ticket/status/audit reads<br/>Admin DLQ inspection"]
+    UI -->|Sign in| COG
+    COG ~~~ API
+    API -->|Write routes| IDEM
+    API -->|Read routes| READ
+  end
+
+  subgraph ROW2["02 · ASYNC PROCESSING · QUEUE / STORAGE / NOTIFICATIONS"]
+    direction LR
+    SQS["SQS FIFO · Writes queue"]
+    DLQ["SQS FIFO Dead-Letter Queue<br/>Redrive after 3 failed receives"]
+    WRITE["Write Lambda · SQS consumer<br/>Transactional DynamoDB writes"]
+    DDB[("DynamoDB · Tickets · Idempotency<br/>Audit · Notifications outbox")]
+    EVENT["EventBridge<br/>Rate: 1 minute"]
+    WORKER["Notification Worker Lambda<br/>Query/update outbox · publish to SNS"]
+    SNS["SNS alerts topic<br/>Admin email subscription"]
+
+    SQS -->|3 failed receives| DLQ
+    SQS -->|Event source mapping| WRITE
+    WRITE -->|Transactional ticket · operation · audit · outbox writes| DDB
+    EVENT -->|Scheduled invoke · every minute| WORKER
+    DDB -->|Notification outbox| WORKER
+    WORKER -->|Publish| SNS
+  end
+
+  subgraph ROW3["03 · MONITORING · OPERATIONS"]
+    direction LR
+    LOGS["CloudWatch Logs · API access · Lambda"]
+    METRICS["CloudWatch Metrics<br/>API · Lambda · SQS · DynamoDB<br/>TechAssist/Notifications custom metric"]
+    DASH["Dashboard · 5 widgets<br/>API Lambda: invocations/errors/duration<br/>Writes + DLQ · Tickets R/W capacity<br/>Worker invocations/errors/duration · API 4XX/5XX"]
+    ALARMS["CloudWatch Alarms · 7 alarms / 6 categories<br/>Actions → SNS"]
+    BUDGET["AWS Budgets<br/>Monthly actual-cost email alerts"]
+    METRICS -->|Dashboard data| DASH
+    METRICS -->|Alarm evaluation| ALARMS
+    LOGS ~~~ METRICS
+    METRICS ~~~ DASH
+    DASH ~~~ ALARMS
+    ALARMS ~~~ BUDGET
+  end
+
+  ROW1 ~~~ ROW2
+  ROW2 ~~~ ROW3
+
+  classDef frontend fill:#edf4fb,stroke:#4d7193,color:#17334d,stroke-width:2px;
+  classDef auth fill:#e7f1ff,stroke:#4779a8,color:#193c5b,stroke-width:2px;
+  classDef api fill:#e8f3fb,stroke:#39789b,color:#15394e,stroke-width:2px;
+  classDef lambda fill:#eaf5ec,stroke:#54845d,color:#1c3c24,stroke-width:2px;
+  classDef queue fill:#fff3df,stroke:#b57a26,color:#55380e,stroke-width:2px;
+  classDef database fill:#fff7e2,stroke:#a77b2a,color:#4d390f,stroke-width:2px;
+  classDef notification fill:#f2eafb,stroke:#8060a3,color:#38264d,stroke-width:2px;
+  classDef monitoring fill:#f3eef8,stroke:#796290,color:#362a43,stroke-width:2px;
+
+  class UI frontend;
+  class COG auth;
+  class API api;
+  class IDEM,READ,WRITE,WORKER lambda;
+  class SQS,DLQ queue;
+  class DDB database;
+  class EVENT,SNS notification;
+  class LOGS,METRICS,DASH,ALARMS,BUDGET monitoring;
+
+  style ROW1 fill:#f9fbfe,stroke:#9db1c5,stroke-width:1.5px
+  style ROW2 fill:#fcfbf7,stroke:#bba77d,stroke-width:1.5px
+  style ROW3 fill:#fbf9fd,stroke:#b2a2c2,stroke-width:1.5px
